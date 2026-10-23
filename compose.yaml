@@ -1,0 +1,37 @@
+# OPTIONAL deploy reference only.
+# Local Windows development does NOT use Docker.
+# Prefer native MySQL/MariaDB. See docs/DEVELOPMENT.md.
+
+name: inspect
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-inspect}
+      MYSQL_USER: ${MYSQL_USER:-inspect_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change_me}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change_me_root}
+    ports:
+      - '${MYSQL_PORT:-3306}:3306'
+    volumes:
+      - inspect_mysql_data:/var/lib/mysql
+    command: ['--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mysqladmin',
+          'ping',
+          '-h',
+          '127.0.0.1',
+          '-uroot',
+          '-p${MYSQL_ROOT_PASSWORD:-change_me_root}',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  inspect_mysql_data:

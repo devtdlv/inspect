@@ -1,0 +1,40 @@
+{
+  "name": "inspect",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Self-hosted API monitoring and observability",
+  "license": "MIT",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm run dev -w @inspect/api\" \"npm run dev -w @inspect/web\"",
+    "dev:api": "npm run dev -w @inspect/api",
+    "dev:web": "npm run dev -w @inspect/web",
+    "build": "npm run build -w @inspect/shared && npm run build -w @inspect/api && npm run build -w @inspect/web",
+    "build:shared": "npm run build -w @inspect/shared",
+    "build:api": "npm run build -w @inspect/api",
+    "build:web": "npm run build -w @inspect/web",
+    "lint": "npm run lint -w @inspect/shared -w @inspect/api -w @inspect/web",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run typecheck -w @inspect/shared -w @inspect/api -w @inspect/web",
+    "test": "npm run test -w @inspect/shared -w @inspect/api -w @inspect/web",
+    "test:api": "npm run test -w @inspect/api",
+    "test:web": "npm run test -w @inspect/web",
+    "db:generate": "node scripts/run-with-env.mjs npm run prisma:generate -w @inspect/api",
+    "db:migrate": "node scripts/run-with-env.mjs npm run prisma:migrate -w @inspect/api",
+    "db:migrate:deploy": "node scripts/run-with-env.mjs npm run prisma:migrate:deploy -w @inspect/api",
+    "db:studio": "node scripts/run-with-env.mjs npm run prisma:studio -w @inspect/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3"
+  }
+}

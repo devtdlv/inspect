@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+/// Foundation metadata store for application-level key/value records.
+/// Domain models (users, monitors, incidents) arrive in later milestones.
+model AppMeta {
+  id        String   @id @default(cuid())
+  key       String   @unique @db.VarChar(191)
+  value     String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_meta")
+}
+
+enum JobStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+/// Durable MySQL-backed background jobs (NestJS Scheduler workers claim rows).
+/// Execution is at-least-once; handlers must be idempotent.
+model BackgroundJob {
+  id          String    @id @default(cuid())
+  type        String    @db.VarChar(100)
+  payload     Json
+  status      JobStatus @default(pending)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3) @map("max_attempts")
+  runAt       DateTime  @default(now()) @map("run_at")
+  lockedBy    String?   @map("locked_by") @db.VarChar(100)
+  lockedUntil DateTime? @map("locked_until")
+  lastError   String?   @map("last_error") @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  completedAt DateTime? @map("completed_at")
+
+  @@index([status, runAt], map: "background_jobs_status_run_at_idx")
+  @@index([lockedUntil], map: "background_jobs_locked_until_idx")
+  @@index([type, status], map: "background_jobs_type_status_idx")
+  @@map("background_jobs")
+}
