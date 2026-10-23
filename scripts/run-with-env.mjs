@@ -17,26 +17,29 @@ function resolveEnvPath() {
       return candidate;
     }
   }
-  return resolve(repoRoot, '.env');
+  return null;
 }
 
 const envPath = resolveEnvPath();
-try {
-  const text = readFileSync(envPath, 'utf8');
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith('#')) continue;
-    const idx = line.indexOf('=');
-    if (idx === -1) continue;
-    const key = line.slice(0, idx).trim();
-    const value = line.slice(idx + 1);
-    if (key && process.env[key] === undefined) {
-      process.env[key] = value;
+if (envPath) {
+  try {
+    const text = readFileSync(envPath, 'utf8');
+    for (const rawLine of text.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+      const idx = line.indexOf('=');
+      if (idx === -1) continue;
+      const key = line.slice(0, idx).trim();
+      const value = line.slice(idx + 1);
+      // Do not override variables already provided by the shell or CI.
+      if (key && process.env[key] === undefined) {
+        process.env[key] = value;
+      }
     }
+  } catch (error) {
+    console.error(`Unable to load ${envPath}: ${error instanceof Error ? error.message : error}`);
+    process.exit(1);
   }
-} catch (error) {
-  console.error(`Unable to load ${envPath}: ${error instanceof Error ? error.message : error}`);
-  process.exit(1);
 }
 
 const args = process.argv.slice(2);
