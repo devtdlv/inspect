@@ -1,8 +1,9 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, UnauthorizedException, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { SessionGuard } from '../src/auth/guards/session.guard';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { configuration, validateEnv } from '../src/config/configuration';
 import { HealthController } from '../src/health/health.controller';
@@ -16,11 +17,18 @@ describe('API foundation (http)', () => {
   let app: INestApplication<App>;
   let healthService: HealthService;
   let jobsDiagnostics: JobsDiagnosticsService;
+  let sessionGuard: { canActivate: jest.Mock };
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
     process.env.DATABASE_URL =
       process.env.DATABASE_URL ?? 'mysql://inspect_app:test@127.0.0.1:3306/inspect';
+
+    sessionGuard = {
+      canActivate: jest.fn().mockImplementation(() => {
+        throw new UnauthorizedException('Authentication required');
+      }),
+    };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
@@ -50,7 +58,10 @@ describe('API foundation (http)', () => {
           },
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(SessionGuard)
+      .useValue(sessionGuard)
+      .compile();
 
     app = moduleFixture.createNestApplication();
     healthService = moduleFixture.get(HealthService);
@@ -109,7 +120,12 @@ describe('API foundation (http)', () => {
     await request(app.getHttpServer()).get('/readyz').expect(200);
   });
 
-  it('GET /api/v1/diagnostics/queue returns job diagnostics', async () => {
+  it('GET /api/v1/diagnostics/queue requires authentication', async () => {
+    await request(app.getHttpServer()).get('/api/v1/diagnostics/queue').expect(401);
+  });
+
+  it('GET /api/v1/diagnostics/queue returns job diagnostics when authenticated', async () => {
+    sessionGuard.canActivate.mockResolvedValueOnce(true);
     (jobsDiagnostics.getDiagnostics as jest.Mock).mockResolvedValue({
       status: 'ok',
       queue: 'background_jobs',

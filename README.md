@@ -46,7 +46,7 @@ npm run dev
 - `GET /healthz` — liveness
 - `GET /readyz` — MySQL + job worker readiness
 - `GET /api/v1` — metadata
-- `GET /api/v1/diagnostics/queue` — MySQL job diagnostic
+- `GET /api/v1/diagnostics/queue` — MySQL job diagnostic (authenticated session required)
 - `POST /api/v1/auth/register` — register (sets session cookies)
 - `POST /api/v1/auth/login` — login (sets session cookies)
 - `POST /api/v1/auth/logout` — logout (CSRF required)

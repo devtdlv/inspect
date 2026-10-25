@@ -39,6 +39,7 @@ export class AuthService {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        // Deliberate account-existence signal for registration UX. See docs/AUTH.md.
         throw new ConflictException('An account with this email already exists');
       }
       throw error;
@@ -61,8 +62,7 @@ export class AuthService {
     const email = normalizeEmail(emailRaw);
     const user = await this.prisma.user.findUnique({ where: { email } });
 
-    // Constant-ish failure path: always verify when possible; generic message.
-    const valid = user !== null && (await this.passwords.verify(user.passwordHash, password));
+    const valid = await this.passwords.verifyForLogin(user?.passwordHash, password);
 
     if (!user || !valid) {
       throw new UnauthorizedException('Invalid email or password');

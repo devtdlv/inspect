@@ -60,10 +60,10 @@ npm run build
 ### Authentication tests
 
 ```powershell
-npm run test -w @inspect/api -- --testPathPattern=auth
+node scripts/run-with-env.mjs npm run test -w @inspect/api -- --testPathPatterns=auth
 ```
 
-HTTP auth e2e cases need MySQL with migrations applied; they skip cleanly if the database is unreachable.
+HTTP auth e2e cases require MySQL with migrations applied and fail if the database is unreachable (they do not silently skip).
 
 ## MariaDB notes (this machine)
 

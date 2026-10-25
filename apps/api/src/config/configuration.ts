@@ -10,7 +10,16 @@ import {
   Min,
   validateSync,
 } from 'class-validator';
-import { DEFAULT_SESSION_TTL_SECONDS } from '../auth/auth.constants';
+import {
+  DEFAULT_AUTH_SENSITIVE_RATE_LIMIT,
+  DEFAULT_AUTH_SENSITIVE_RATE_TTL_MS,
+  DEFAULT_SESSION_TTL_SECONDS,
+  MAX_AUTH_SENSITIVE_RATE_LIMIT,
+  MAX_AUTH_SENSITIVE_RATE_LIMIT_PRODUCTION,
+  MAX_AUTH_SENSITIVE_RATE_TTL_MS,
+  MIN_AUTH_SENSITIVE_RATE_LIMIT,
+  MIN_AUTH_SENSITIVE_RATE_TTL_MS,
+} from '../auth/auth.constants';
 
 export class EnvironmentVariables {
   @IsOptional()
@@ -88,6 +97,22 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsIn(['lax', 'strict', 'none'])
   COOKIE_SAME_SITE?: 'lax' | 'strict' | 'none' = 'lax';
+
+  @IsOptional()
+  @IsBoolean()
+  AUTH_REQUIRE_ORIGIN?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(MIN_AUTH_SENSITIVE_RATE_LIMIT)
+  @Max(MAX_AUTH_SENSITIVE_RATE_LIMIT)
+  AUTH_SENSITIVE_RATE_LIMIT?: number = DEFAULT_AUTH_SENSITIVE_RATE_LIMIT;
+
+  @IsOptional()
+  @IsInt()
+  @Min(MIN_AUTH_SENSITIVE_RATE_TTL_MS)
+  @Max(MAX_AUTH_SENSITIVE_RATE_TTL_MS)
+  AUTH_SENSITIVE_RATE_TTL_MS?: number = DEFAULT_AUTH_SENSITIVE_RATE_TTL_MS;
 }
 
 export interface AppConfig {
@@ -111,6 +136,9 @@ export interface AppConfig {
     sessionTtlSeconds: number;
     cookieSecure: boolean;
     cookieSameSite: 'lax' | 'strict' | 'none';
+    requireOrigin: boolean;
+    sensitiveRateLimit: number;
+    sensitiveRateTtlMs: number;
   };
 }
 
@@ -135,6 +163,10 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
       config.COOKIE_SECURE !== undefined
         ? parseOptionalBoolean(String(config.COOKIE_SECURE))
         : undefined,
+    AUTH_REQUIRE_ORIGIN:
+      config.AUTH_REQUIRE_ORIGIN !== undefined
+        ? parseOptionalBoolean(String(config.AUTH_REQUIRE_ORIGIN))
+        : undefined,
   };
 
   const validated = plainToInstance(EnvironmentVariables, withBooleans, {
@@ -153,10 +185,30 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     throw new Error(`Configuration validation failed: ${messages}`);
   }
 
-  const effectiveSecure = validated.COOKIE_SECURE ?? validated.NODE_ENV === 'production';
+  const nodeEnv = validated.NODE_ENV ?? 'development';
+  const effectiveSecure = validated.COOKIE_SECURE ?? nodeEnv === 'production';
   if (validated.COOKIE_SAME_SITE === 'none' && !effectiveSecure) {
     throw new Error(
       'Configuration validation failed: COOKIE_SAME_SITE=none requires COOKIE_SECURE=true',
+    );
+  }
+
+  if (nodeEnv === 'production' && validated.COOKIE_SECURE === false) {
+    throw new Error(
+      'Configuration validation failed: COOKIE_SECURE=false is not allowed when NODE_ENV=production',
+    );
+  }
+
+  const rateLimit = validated.AUTH_SENSITIVE_RATE_LIMIT ?? DEFAULT_AUTH_SENSITIVE_RATE_LIMIT;
+  if (nodeEnv === 'production' && rateLimit > MAX_AUTH_SENSITIVE_RATE_LIMIT_PRODUCTION) {
+    throw new Error(
+      `Configuration validation failed: AUTH_SENSITIVE_RATE_LIMIT must be <= ${MAX_AUTH_SENSITIVE_RATE_LIMIT_PRODUCTION} in production`,
+    );
+  }
+
+  if (validated.AUTH_REQUIRE_ORIGIN === false && nodeEnv === 'production') {
+    throw new Error(
+      'Configuration validation failed: AUTH_REQUIRE_ORIGIN=false is not allowed when NODE_ENV=production',
     );
   }
 
@@ -170,6 +222,17 @@ export function configuration(): AppConfig {
     (process.env.COOKIE_SAME_SITE as 'lax' | 'strict' | 'none' | undefined) ?? 'lax';
 
   const cookieSecure = cookieSecureEnv ?? nodeEnv === 'production';
+
+  const requireOriginEnv = parseOptionalBoolean(process.env.AUTH_REQUIRE_ORIGIN);
+  // Production and SameSite=None always require Origin. Dev/test may omit for CLI/tests.
+  const requireOrigin = requireOriginEnv ?? (nodeEnv === 'production' || cookieSameSite === 'none');
+
+  const sensitiveRateLimit = Number(
+    process.env.AUTH_SENSITIVE_RATE_LIMIT ?? DEFAULT_AUTH_SENSITIVE_RATE_LIMIT,
+  );
+  const sensitiveRateTtlMs = Number(
+    process.env.AUTH_SENSITIVE_RATE_TTL_MS ?? DEFAULT_AUTH_SENSITIVE_RATE_TTL_MS,
+  );
 
   return {
     nodeEnv,
@@ -192,6 +255,9 @@ export function configuration(): AppConfig {
       sessionTtlSeconds: Number(process.env.SESSION_TTL_SECONDS ?? DEFAULT_SESSION_TTL_SECONDS),
       cookieSecure,
       cookieSameSite,
+      requireOrigin,
+      sensitiveRateLimit,
+      sensitiveRateTtlMs,
     },
   };
 }

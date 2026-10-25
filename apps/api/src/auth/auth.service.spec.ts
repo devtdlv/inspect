@@ -16,6 +16,7 @@ describe('AuthService', () => {
   const passwords = {
     hash: jest.fn().mockResolvedValue('hashed'),
     verify: jest.fn(),
+    verifyForLogin: jest.fn(),
   } as unknown as PasswordService;
 
   const sessions = {
@@ -81,9 +82,10 @@ describe('AuthService', () => {
       passwordHash: 'hashed',
       createdAt,
     });
-    (passwords.verify as jest.Mock).mockResolvedValue(true);
+    (passwords.verifyForLogin as jest.Mock).mockResolvedValue(true);
 
     const result = await auth.login('user@example.com', 'password123');
+    expect(passwords.verifyForLogin).toHaveBeenCalledWith('hashed', 'password123');
     expect(result.response.user.id).toBe('u1');
     expect(result.rawToken).toBe('raw-session');
   });
@@ -95,7 +97,7 @@ describe('AuthService', () => {
       passwordHash: 'hashed',
       createdAt: new Date(),
     });
-    (passwords.verify as jest.Mock).mockResolvedValue(false);
+    (passwords.verifyForLogin as jest.Mock).mockResolvedValue(false);
 
     await expect(auth.login('user@example.com', 'bad')).rejects.toThrow(
       'Invalid email or password',
@@ -105,11 +107,14 @@ describe('AuthService', () => {
     );
   });
 
-  it('rejects unknown emails with the same generic message', async () => {
+  it('rejects unknown emails with the same generic message and still verifies', async () => {
     (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+    (passwords.verifyForLogin as jest.Mock).mockResolvedValue(false);
+
     await expect(auth.login('missing@example.com', 'password123')).rejects.toThrow(
       'Invalid email or password',
     );
+    expect(passwords.verifyForLogin).toHaveBeenCalledWith(undefined, 'password123');
   });
 
   it('revokes the session on logout when a token is present', async () => {

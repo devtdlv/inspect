@@ -1,8 +1,14 @@
-import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
+import { SessionGuard } from '../auth/guards/session.guard';
 import { JobsDiagnosticsService } from './jobs-diagnostics.service';
 
+/**
+ * Operational queue diagnostics. Requires an authenticated session.
+ * Future milestones may additionally require an administrator role.
+ */
 @Controller('diagnostics/queue')
+@UseGuards(SessionGuard)
 export class JobsController {
   constructor(private readonly jobsDiagnostics: JobsDiagnosticsService) {}
 

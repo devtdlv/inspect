@@ -15,6 +15,7 @@ import {
 import { PasswordService } from '../src/auth/password.service';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { AppConfig, configuration, validateEnv } from '../src/config/configuration';
+import { JobsModule } from '../src/jobs/jobs.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -82,6 +83,7 @@ describe('Auth HTTP (email/password sessions)', () => {
         ThrottlerModule.forRoot([{ ttl: 60_000, limit: 200 }]),
         PrismaModule,
         AuthModule,
+        JobsModule,
       ],
     }).compile();
 
@@ -309,12 +311,52 @@ describe('Auth HTTP (email/password sessions)', () => {
     expect(sessions.every((session) => session.revokedAt !== null)).toBe(true);
   });
 
+  it('allows login without Origin in test/dev and accepts the configured Origin', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({ email: email('originok'), password: 'password123' })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: email('originok'), password: 'password123' })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .set('Origin', 'http://localhost:5173')
+      .send({ email: email('originok'), password: 'password123' })
+      .expect(200);
+  });
+
   it('rejects disallowed Origin on login', async () => {
     await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .set('Origin', 'https://evil.example')
       .send({ email: email('origin'), password: 'password123' })
       .expect(403);
+  });
+
+  it('requires authentication for queue diagnostics and allows an authenticated session', async () => {
+    await request(app.getHttpServer()).get('/api/v1/diagnostics/queue').expect(401);
+
+    const registered = await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({ email: email('diag'), password: 'password123' })
+      .expect(201);
+
+    const cookies = parseSetCookies(registered.headers['set-cookie']);
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/diagnostics/queue')
+      .set(
+        'Cookie',
+        asCookieHeader({
+          [SESSION_COOKIE_NAME]: cookies[SESSION_COOKIE_NAME],
+        }),
+      )
+      .expect(200);
+
+    expect(response.body.backend).toBe('mysql-jobs');
   });
 
   it('rate-limits repeated login attempts', async () => {
