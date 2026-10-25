@@ -4,7 +4,7 @@ Inspect is delivered in eight milestones. Only completed work is marked done.
 
 ## Milestone 1 — Foundation & Development Environment
 
-**Status:** In progress (this milestone)
+**Status:** Complete
 
 - Monorepo with npm workspaces (`apps/web`, `apps/api`, `packages/shared`)
 - NestJS API bootstrap with config validation, logging, CORS, and error handling
@@ -17,9 +17,17 @@ Inspect is delivered in eight milestones. Only completed work is marked done.
 
 ## Milestone 2 — Authentication, Workspaces & Monitors
 
-**Status:** Not started
+**Status:** Phase 1 in progress (email/password auth). Workspaces and monitors not started.
 
-- User registration and login
+### Phase 1 — Email and password authentication
+
+- User registration and login (Argon2id, opaque cookie sessions)
+- Session revocation, CSRF protections, rate limits
+- `GET /api/v1/auth/me`
+- See [AUTH.md](./AUTH.md)
+
+### Later phases (not started)
+
 - Personal workspaces
 - Monitor CRUD for HTTP/HTTPS endpoints
 - Authorization boundaries between workspaces
@@ -28,7 +36,7 @@ Inspect is delivered in eight milestones. Only completed work is marked done.
 
 **Status:** Not started
 
-- Scheduled health checks via BullMQ workers
+- Scheduled health checks via MySQL-backed jobs / NestJS Scheduler workers
 - Response-time measurement
 - Safe outbound HTTP probing with SSRF protections
 - Check result persistence

@@ -1,5 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import {
+  IsBoolean,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -9,6 +10,7 @@ import {
   Min,
   validateSync,
 } from 'class-validator';
+import { DEFAULT_SESSION_TTL_SECONDS } from '../auth/auth.constants';
 
 export class EnvironmentVariables {
   @IsOptional()
@@ -72,6 +74,20 @@ export class EnvironmentVariables {
   @Min(100)
   @Max(30000)
   HEALTH_CHECK_TIMEOUT_MS?: number = 2000;
+
+  @IsOptional()
+  @IsInt()
+  @Min(60)
+  @Max(60 * 60 * 24 * 90)
+  SESSION_TTL_SECONDS?: number = DEFAULT_SESSION_TTL_SECONDS;
+
+  @IsOptional()
+  @IsBoolean()
+  COOKIE_SECURE?: boolean;
+
+  @IsOptional()
+  @IsIn(['lax', 'strict', 'none'])
+  COOKIE_SAME_SITE?: 'lax' | 'strict' | 'none' = 'lax';
 }
 
 export interface AppConfig {
@@ -91,10 +107,37 @@ export interface AppConfig {
   jobLeaseSeconds: number;
   jobDiagnosticRetentionHours: number;
   healthCheckTimeoutMs: number;
+  auth: {
+    sessionTtlSeconds: number;
+    cookieSecure: boolean;
+    cookieSameSite: 'lax' | 'strict' | 'none';
+  };
+}
+
+function parseOptionalBoolean(value: string | undefined): boolean | undefined {
+  if (value === undefined || value === '') {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+  return undefined;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
-  const validated = plainToInstance(EnvironmentVariables, config, {
+  const withBooleans = {
+    ...config,
+    COOKIE_SECURE:
+      config.COOKIE_SECURE !== undefined
+        ? parseOptionalBoolean(String(config.COOKIE_SECURE))
+        : undefined,
+  };
+
+  const validated = plainToInstance(EnvironmentVariables, withBooleans, {
     enableImplicitConversion: true,
   });
 
@@ -110,12 +153,26 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     throw new Error(`Configuration validation failed: ${messages}`);
   }
 
+  const effectiveSecure = validated.COOKIE_SECURE ?? validated.NODE_ENV === 'production';
+  if (validated.COOKIE_SAME_SITE === 'none' && !effectiveSecure) {
+    throw new Error(
+      'Configuration validation failed: COOKIE_SAME_SITE=none requires COOKIE_SECURE=true',
+    );
+  }
+
   return validated;
 }
 
 export function configuration(): AppConfig {
+  const nodeEnv = process.env.NODE_ENV ?? 'development';
+  const cookieSecureEnv = parseOptionalBoolean(process.env.COOKIE_SECURE);
+  const cookieSameSite =
+    (process.env.COOKIE_SAME_SITE as 'lax' | 'strict' | 'none' | undefined) ?? 'lax';
+
+  const cookieSecure = cookieSecureEnv ?? nodeEnv === 'production';
+
   return {
-    nodeEnv: process.env.NODE_ENV ?? 'development',
+    nodeEnv,
     app: {
       name: process.env.APP_NAME ?? 'Inspect',
       version: process.env.APP_VERSION ?? '0.0.1',
@@ -131,5 +188,10 @@ export function configuration(): AppConfig {
     jobLeaseSeconds: Number(process.env.JOB_LEASE_SECONDS ?? 30),
     jobDiagnosticRetentionHours: Number(process.env.JOB_DIAGNOSTIC_RETENTION_HOURS ?? 24),
     healthCheckTimeoutMs: Number(process.env.HEALTH_CHECK_TIMEOUT_MS ?? 2000),
+    auth: {
+      sessionTtlSeconds: Number(process.env.SESSION_TTL_SECONDS ?? DEFAULT_SESSION_TTL_SECONDS),
+      cookieSecure,
+      cookieSameSite,
+    },
   };
 }

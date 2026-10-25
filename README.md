@@ -2,7 +2,7 @@
 
 Self-hosted API monitoring and observability for HTTP/HTTPS endpoints.
 
-**Status:** Milestone 1 — Foundation & Development Environment (MySQL)
+**Status:** Milestone 2 Phase 1 — Email/password authentication (MySQL sessions)
 
 **Repository:** https://github.com/devtdlv/inspect
 
@@ -20,8 +20,8 @@ No Docker, WSL, PostgreSQL, or Redis for local development.
 
 ## Roadmap
 
-1. Foundation & Development Environment (current)
-2. Authentication, Workspaces & Monitors
+1. Foundation & Development Environment (complete)
+2. Authentication, Workspaces & Monitors (Phase 1: auth in progress)
 3. Monitoring Engine
 4. Dashboard & Analytics
 5. Incident Management
@@ -47,10 +47,15 @@ npm run dev
 - `GET /readyz` — MySQL + job worker readiness
 - `GET /api/v1` — metadata
 - `GET /api/v1/diagnostics/queue` — MySQL job diagnostic
+- `POST /api/v1/auth/register` — register (sets session cookies)
+- `POST /api/v1/auth/login` — login (sets session cookies)
+- `POST /api/v1/auth/logout` — logout (CSRF required)
+- `GET /api/v1/auth/me` — current user
 
 ## Docs
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Authentication](docs/AUTH.md)
 - [Development](docs/DEVELOPMENT.md)
 - [Jobs](docs/JOBS.md)
 - [Security](docs/SECURITY.md)

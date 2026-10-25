@@ -22,6 +22,19 @@ npm run build:shared
 
 Creates database `inspect` and user `inspect_app` with privileges limited to that database. Writes `DATABASE_URL` to gitignored `.env`.
 
+### Auth migration (Milestone 2 Phase 1)
+
+After pulling schema changes that add `users` / `sessions`:
+
+```powershell
+npm run db:generate
+npm run db:migrate:deploy
+```
+
+This applies versioned migrations only (does not reset the database). Confirm against your local MariaDB before running deploy on shared environments.
+
+Optional auth-related env vars are listed in `.env.example` (`SESSION_TTL_SECONDS`, `COOKIE_SECURE`, `COOKIE_SAME_SITE`). Defaults are suitable for local HTTP development.
+
 ## Start
 
 ```powershell
@@ -30,7 +43,9 @@ npm run dev
 
 - Web: http://localhost:5173
 - API: http://localhost:3001
-- The API process includes the NestJS Scheduler job worker (no separate worker process in Milestone 1)
+- The API process includes the NestJS Scheduler job worker (no separate worker process)
+
+Auth API details: [AUTH.md](./AUTH.md).
 
 ## Quality
 
@@ -41,6 +56,14 @@ npm run typecheck
 npm run test
 npm run build
 ```
+
+### Authentication tests
+
+```powershell
+npm run test -w @inspect/api -- --testPathPattern=auth
+```
+
+HTTP auth e2e cases need MySQL with migrations applied; they skip cleanly if the database is unreachable.
 
 ## MariaDB notes (this machine)
 

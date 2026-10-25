@@ -41,6 +41,21 @@ export interface QueueDiagnosticsResponse {
   timestamp: string;
 }
 
+/** Public user shape returned by auth endpoints (never includes password or hashes). */
+export interface AuthUser {
+  id: string;
+  email: string;
+  createdAt: string;
+}
+
+export interface AuthUserResponse {
+  user: AuthUser;
+}
+
+export interface AuthLogoutResponse {
+  ok: true;
+}
+
 export function isHealthyStatus(status: HealthStatus): boolean {
   return status === 'ok';
 }

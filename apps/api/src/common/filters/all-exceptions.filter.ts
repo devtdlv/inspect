@@ -13,6 +13,8 @@ import type { ApiErrorBody } from '@inspect/shared';
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
+  constructor(private readonly nodeEnv: string = process.env.NODE_ENV ?? 'development') {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -36,8 +38,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (typeof body.error === 'string') {
         error = body.error;
       }
-    } else if (exception instanceof Error) {
+    } else if (exception instanceof Error && this.nodeEnv !== 'production') {
       message = exception.message;
+    }
+
+    if (status >= 500 && this.nodeEnv === 'production') {
+      message = 'Internal server error';
+      error = 'Internal Server Error';
     }
 
     const payload: ApiErrorBody = {

@@ -1,6 +1,7 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { AppConfig } from './config/configuration';
@@ -15,10 +16,13 @@ async function bootstrap(): Promise<void> {
 
   app.enableShutdownHooks();
 
+  app.use(cookieParser());
+
   app.setGlobalPrefix('api/v1', {
     exclude: ['healthz', 'readyz'],
   });
 
+  // Single configured origin only (never '*') with credentials for session cookies.
   app.enableCors({
     origin: config.get('api.corsOrigin', { infer: true }),
     credentials: true,
@@ -33,7 +37,7 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalFilters(new AllExceptionsFilter(config.get('nodeEnv', { infer: true })));
 
   const host = config.get('api.host', { infer: true });
   const port = config.get('api.port', { infer: true });
